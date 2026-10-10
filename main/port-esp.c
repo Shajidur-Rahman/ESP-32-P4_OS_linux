@@ -35,7 +35,7 @@ void *jit_exec_alloc(int bytes)
 void jit_exec_commit(void *code, int bytes)
 {
         esp_cache_msync(code, bytes,
-                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_INSTRAM);
+                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_TYPE_INST);
 }
 
 uint64_t GetTimeMicroseconds()
@@ -87,7 +87,7 @@ int console_read_bytes(uint8_t *buf, int len)
         return n;
 }
 
-void console_write(const char *buf, int len)
+void emu_console_write(const char *buf, int len)
 {
         fwrite(buf, 1, len, stdout);
 }
@@ -206,7 +206,7 @@ void verify_kernel_header(void)
         printf("Expected: 0x05c0006f (j 0x5c)\n\n");
 }
 
-int load_dtb(uint32_t ram_size)
+uint32_t load_dtb(uint32_t ram_size)
 {
         const esp_partition_t *dtb_partition;
         esp_err_t err;
@@ -231,7 +231,7 @@ int load_dtb(uint32_t ram_size)
                 return 0;
         }
 
-        printf("Found dtb partition, %zu bytes\n", dtb_partition->size);
+        printf("Found dtb partition, %" PRIu32 " bytes\n", dtb_partition->size);
 
         addr = 0;
         remaining = dtb_partition->size;

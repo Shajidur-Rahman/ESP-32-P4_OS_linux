@@ -1,5 +1,8 @@
 idf_component_register(SRCS "uc-rv32ima.c"
 			"port-esp.c"
+			"jit-call.S"
+			"wifi_manager.c"
+			"wifi_terminal.c"
 		       LDFRAGMENTS "link.lf"
                        INCLUDE_DIRS ".")
 

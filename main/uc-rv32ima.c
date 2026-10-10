@@ -249,6 +249,13 @@ static void console_tx_push(uint8_t c)
         console_tx_head = next;
 }
 
+void wifi_terminal_push_rx(uint8_t c)
+{
+        uart_rx_push(c);
+}
+
+#include "wifi_terminal.h"
+
 void console_flush(void)
 {
         uint16_t used;
@@ -263,7 +270,8 @@ void console_flush(void)
                         chunk[i] = console_txbuf[console_tx_tail];
                         console_tx_tail = (console_tx_tail + 1) % CONSOLE_TXBUF_SZ;
                 }
-                console_write(chunk, used);
+                emu_console_write(chunk, used);
+                wifi_terminal_send_data(chunk, used);
         }
 }
 
@@ -430,13 +438,37 @@ static void io_worker_task(void *arg)
 static void emu_task(void *arg)
 {
         (void)arg;
-        app_main();
+        emu_run();
         vTaskDelete(NULL);
 }
 #endif
 
+#include "nvs_flash.h"
+#include "esp_netif.h"
+#include "esp_event.h"
+#include "wifi_manager.h"
+#include "wifi_terminal.h"
+
 void app_main(void)
 {
+        // Initialize NVS
+        esp_err_t ret = nvs_flash_init();
+        if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+                nvs_flash_erase();
+                nvs_flash_init();
+        }
+
+        // Initialize TCP/IP and event loop
+        esp_netif_init();
+        esp_event_loop_create_default();
+
+        // Initialize Wi-Fi via on-board ESP32-C6
+        printf("Initializing Wi-Fi (ESP32-C6)...\n");
+        wifi_manager_init();
+
+        // Start Wi-Fi Telnet Terminal Server
+        wifi_terminal_start();
+
 #ifdef CONFIG_EMU_IO_CORE
         // worker first, the emulator spins on it when the tx ring fills up
         xTaskCreatePinnedToCore(io_worker_task, "rv32io", 4096, NULL, 5, NULL, 1);
@@ -459,7 +491,7 @@ static void emu_run(void)
 
         size_t psram_size = psram_get_size();
         if (ram_amt > psram_size) {
-                printf("ram_amt %u exceeds psram, cutting to %zu\n",
+                printf("ram_amt %" PRIu32 " exceeds psram, cutting to %zu\n",
                            ram_amt, psram_size);
                 ram_amt = psram_size & ~0xFFFU;
         }
